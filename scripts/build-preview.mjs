@@ -5,7 +5,7 @@ const root = new URL('../', import.meta.url);
 const out = new URL('dist-preview/', root);
 const engine = await readFile(new URL('invaders-game.html', root));
 const blob = createHash('sha1').update(`blob ${engine.length}\0`).update(engine).digest('hex');
-if (blob !== '63b0c2724c9f7df52fc976261e28c0c52bd0ddca') throw new Error('Pinned Invaders engine mismatch');
+if (blob !== '1c6e32006d567a3b68639dc8ae6919c8fd074000') throw new Error('Invaders preview engine mismatch');
 await rm(out, {recursive:true, force:true});
 await mkdir(out);
 for (const file of ['index.html', 'launcher.js', 'invaders-game.html']) {
