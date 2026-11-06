@@ -16,6 +16,11 @@ window.positionTestTarget = correct => {
 };
 })();</script>`);
 assert.notEqual(engineFixture, engine);
+const bootstrap = await readFile('dist-preview/bootstrap.mjs', 'utf8');
+// Allow HTTP loopback in the intercepted test response only.
+const testBootstrap = bootstrap.replace('engineOrigin:location.origin,buildId',
+  'engineOrigin:location.origin,buildId,allowLoopback:true');
+assert.notEqual(testBootstrap, bootstrap);
 const browser = await chromium.launch({executablePath:process.env.CHROME_BIN});
 try {
   for (const mobile of [false, true]) {
@@ -31,6 +36,9 @@ try {
     });
     await page.route('**/dist-preview/invaders-game.html', route =>
       route.fulfill({contentType:'text/html',body:engineFixture}));
+    await page.route('**/dist-preview/bootstrap.mjs', route =>
+      route.fulfill({contentType:'text/javascript',body:testBootstrap}));
+    page.on('pageerror', error => console.error(error));
     await page.goto(base+'/dist-preview/index.html');
     await page.waitForFunction(() => document.querySelector('#status').textContent === 'Fixture running');
     const frame = page.frames().find(candidate => candidate.url().endsWith('/invaders-game.html'));
