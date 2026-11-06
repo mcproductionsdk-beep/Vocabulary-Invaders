@@ -39,6 +39,11 @@ body:has(#game.active){overflow:hidden}
 #game .buttons button{min-width:0;min-height:44px;padding:5px 2px!important;margin:0!important;font-size:clamp(9px,2.55vw,12px)!important;line-height:1.15;white-space:normal;touch-action:manipulation}
 #game .tip{display:none!important}
 }
+
+.shell-managed .logo,.shell-managed #game .buttons,.shell-managed #again,.shell-managed #overMenu{display:none!important}
+.shell-managed .app:has(#game.active){display:flex;flex-direction:column;width:100%;height:100dvh;margin:0;border:0;box-shadow:none}
+.shell-managed #game.active{display:flex;flex-direction:column;flex:1;min-height:0}
+.shell-managed #game .wrap{flex:1;min-height:0;height:auto;max-height:none}
 </style></head><body><main class="app"><div class="logo">WORD INVADERS</div>
 <section id="menu" hidden aria-hidden="true"><textarea id="words"></textarea><select id="language"><option value="de-DE">German</option><option value="es-ES">Spanish</option><option value="da-DK">Danish</option><option value="en-US">English</option></select><select id="category"></select><div id="voiceCheck"></div><div id="preview"></div><div id="error"></div><button id="testVoice"></button><button id="play"></button><button id="swap"></button></section>
 <section id="game" class="screen active"><div class="hud"><div>SCORE <span id="score">0</span> · <span id="lives">❤❤❤</span></div><div id="progress"></div></div><div id="wrap" class="wrap"><canvas id="canvas"></canvas><div id="toast" class="toast"></div><div id="pauseOverlay" class="overlay"><div class="big" style="color:#f2d64b">PAUSED</div></div><div id="gameOver" class="overlay"><div><div class="big">GAME OVER</div><div class="msg">Nice try, your grandma would be proud</div><button id="again" class="primary">PLAY AGAIN</button><button id="overMenu" class="pink">MAIN MENU</button></div></div></div><div class="buttons"><button id="pause" class="yellow">PAUSE</button><button id="restart">RESTART</button><button id="mainMenu" class="pink">MAIN MENU</button><button id="sound">🔊 SOUND ON</button></div><div id="thumbDeck" class="thumb-deck" aria-label="Drag to steer and tap to fire"><div class="deck-side">◀</div><div class="deck-middle"><div class="deck-action"><span class="deck-icon">◎</span> TAP · FIRE</div><div class="deck-action"><span class="deck-icon">↔</span> DRAG · STEER</div></div><div class="deck-side">▶</div></div><div id="mobileControls" class="mobile-controls" aria-label="Mobile arcade controls"><button id="touchLeft" type="button" aria-label="Move left">◀ LEFT</button><button id="touchFire" class="fire" type="button" aria-label="Fire">● FIRE</button><button id="touchRight" type="button" aria-label="Move right">RIGHT ▶</button></div><div class="tip">MOVE: ← → / A D · FIRE: SPACE / ↑ / W · P: PAUSE</div></section></main>
@@ -61,8 +66,8 @@ function cats(load){var l=E("language").value,s=E("category");s.innerHTML='<opti
 function shuffle(a){a=a.slice();for(var i=a.length-1;i>0;i--){var j=Math.floor(Math.random()*(i+1)),t=a[i];a[i]=a[j];a[j]=t}return a}
 function build(){queue=shuffle(vocab);var retry=vocab.filter(function(v){return(misses[v.id]||0)>0});queue=queue.concat(shuffle(retry));done=0}
 function next(){if(!queue.length){round++;fallSpeed=Math.min(.13,fallSpeed*1.10);enemyFireInterval=Math.max(.48,enemyFireInterval*.90);build();flash("ROUND "+round+" · INVADERS FASTER!",1)}current=queue.shift();hud()}
-function hud(){E("score").textContent=score;E("lives").textContent="❤".repeat(Math.max(0,lives));E("progress").textContent="ROUND "+round+" · "+Math.min(done,vocab.length)+"/"+vocab.length+" WORDS"}
-function start(){var a=parse(ta.value);if(a.length<5){E("error").textContent="Please add at least 5 word pairs.";return}E("error").textContent="";lang=E("language").value;vocab=a.map(function(p,i){return{id:i,target:p[1],prompt:p[0]}});bursts=[];spriteTime=0;score=0;lives=3;round=1;done=0;misses={};fallSpeed=.050;enemyFireInterval=1.35;enemyFireTimer=.75;ship.x=.5;keys.left=false;keys.right=false;shots=[];enemyShots=[];invaders=[];cooldown=0;invincible=0;waveId=0;running=true;paused=false;last=0;build();next();makeWave();menu.classList.remove("active");game.classList.add("active");E("gameOver").classList.remove("show");resize();cancelAnimationFrame(raf);raf=requestAnimationFrame(loop)}
+function hud(){emit({type:"BT_INVADERS_STATE",...state()});E("score").textContent=score;E("lives").textContent="❤".repeat(Math.max(0,lives));E("progress").textContent="ROUND "+round+" · "+Math.min(done,vocab.length)+"/"+vocab.length+" WORDS"}
+function start(){var a=configuredPairs||parse(ta.value);if(a.length<5){E("error").textContent="Please add at least 5 word pairs.";return}E("error").textContent="";lang=E("language").value;vocab=a.map(function(p,i){return{id:i,target:p[1],prompt:p[0]}});bursts=[];spriteTime=0;score=0;lives=3;round=1;done=0;misses={};fallSpeed=.050;enemyFireInterval=1.35;enemyFireTimer=.75;ship.x=.5;keys.left=false;keys.right=false;shots=[];enemyShots=[];invaders=[];cooldown=0;invincible=0;waveId=0;running=true;paused=false;last=0;E("pauseOverlay").classList.remove("show");E("pause").textContent="PAUSE";build();next();makeWave();menu.classList.remove("active");game.classList.add("active");E("gameOver").classList.remove("show");resize();cancelAnimationFrame(raf);raf=requestAnimationFrame(loop)}
 function makeWave(){
  waveId++;
  invaders=[];shots=[];enemyShots=[];enemyFireTimer=Math.min(enemyFireTimer,.65);
@@ -87,7 +92,7 @@ function hit(inv){
  }
  hud()
 }
-function hurt(t){if(invincible>0)return;bursts.push({x:ship.x,y:.86,age:0});lives--;invincible=.8;bad();flash(t,0);hud();if(lives<=0){running=false;E("gameOver").classList.add("show")}}
+function hurt(t){if(invincible>0)return;bursts.push({x:ship.x,y:.86,age:0});lives--;invincible=.8;bad();flash(t,0);hud();if(lives<=0){running=false;E("gameOver").classList.add("show");hud()}}
 function update(dt){
  spriteTime+=dt;
  bursts.forEach(function(b){b.age+=dt});
@@ -126,7 +131,7 @@ function voiceFor(locale){var wanted=(locale||"").toLowerCase(),base=wanted.spli
 function languageName(locale){return{"de-DE":"German","es-ES":"Spanish","da-DK":"Danish","en-US":"English"}[locale]||locale}
 function updateVoiceCheck(){var box=E("voiceCheck");if(!box)return;if(!("speechSynthesis"in window)){box.innerHTML="<b>VOICE:</b> ⚠ Speech synthesis unavailable";return}var locale=E("language").value,v=voiceFor(locale);if(v)box.innerHTML="<b>VOICE:</b> ✓ "+languageName(locale)+" — "+v.name+" · "+v.lang;else if(!speechVoices.length)box.innerHTML="<b>VOICE:</b> checking "+languageName(locale)+"…";else box.innerHTML="<b>VOICE:</b> ⚠ "+languageName(locale).toUpperCase()+" VOICE NOT FOUND<br>No English fallback will be used."}
 if("speechSynthesis"in window){loadVoices();window.speechSynthesis.addEventListener("voiceschanged",loadVoices);setTimeout(loadVoices,150);setTimeout(loadVoices,700)}
-function speak(t){if(window.parent!==window){window.parent.postMessage({type:"BT_INVADERS_SPEAK",text:t,language:lang},"*");return true}if(!soundOn||!("speechSynthesis"in window))return false;loadVoices();var v=voiceFor(lang);if(!v){updateVoiceCheck();return false}try{speechSynthesis.cancel();var u=new SpeechSynthesisUtterance(t);u.voice=v;u.lang=v.lang;u.rate=.82;speechSynthesis.speak(u);return true}catch(e){return false}}function flash(t,ok){var x=E("toast");x.textContent=t;x.style.color=ok?"#79ff70":"#ff6b77";x.style.display="block";clearTimeout(flash.t);flash.t=setTimeout(function(){x.style.display="none"},650)}
+function speak(t){if(window.parent!==window){emit({type:"BT_INVADERS_SPEAK",text:t});return true}if(!soundOn||!("speechSynthesis"in window))return false;loadVoices();var v=voiceFor(lang);if(!v){updateVoiceCheck();return false}try{speechSynthesis.cancel();var u=new SpeechSynthesisUtterance(t);u.voice=v;u.lang=v.lang;u.rate=.82;speechSynthesis.speak(u);return true}catch(e){return false}}function flash(t,ok){var x=E("toast");x.textContent=t;x.style.color=ok?"#79ff70":"#ff6b77";x.style.display="block";clearTimeout(flash.t);flash.t=setTimeout(function(){x.style.display="none"},650)}
 function rect(x,y,w,h,c){ctx.fillStyle=c;ctx.fillRect(x,y,w,h)}
 var bursts=[],spriteTime=0;
 var saucerColors=[
@@ -200,9 +205,9 @@ ctx.restore();if(current){ctx.font="900 "+Math.max(11,Math.min(15,H*.024))+"px C
 function draw(){ctx.clearRect(0,0,W,H);rect(0,0,W,H,"#090b28");for(var i=0;i<stars.length;i++){var s=stars[i];rect(s.x*W,s.y*H,s.z,s.z,i%5===0?"#f2d64b":"#d9edff")}ctx.strokeStyle="#23376f";ctx.lineWidth=2;for(var y=H*.12;y<H*.78;y+=H*.11){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke()}invaders.forEach(drawInvader);ctx.fillStyle="#f2d64b";shots.forEach(function(b){ctx.fillRect(b.x*W-2,b.y*H-10,4,14)});ctx.fillStyle="#ef6689";enemyShots.forEach(function(b){ctx.fillRect(b.x*W-3,b.y*H,6,14)});drawShip();drawBursts()}
 function resize(){var r=wrap.getBoundingClientRect();W=window.matchMedia("(max-width:760px)").matches?Math.max(1,r.width):Math.max(320,r.width);H=window.matchMedia("(max-width:760px)").matches?Math.max(1,r.height):Math.max(400,r.height);DPR=Math.max(1,window.devicePixelRatio||1);canvas.width=W*DPR;canvas.height=H*DPR;canvas.style.width=W+"px";canvas.style.height=H+"px";ctx.setTransform(DPR,0,0,DPR,0,0);if(!stars.length){for(var i=0;i<75;i++)stars.push({x:Math.random(),y:Math.random(),z:1+Math.floor(Math.random()*3)})}draw()}
 function loop(n){if(!running||paused)return;if(!last)last=n;var dt=Math.min(.04,(n-last)/1000);last=n;update(dt);draw();if(running)raf=requestAnimationFrame(loop)}
-function pause(){if(!running)return;paused=!paused;if(paused){keys.left=false;keys.right=false;}E("pauseOverlay").classList.toggle("show",paused);E("pause").textContent=paused?"RESUME":"PAUSE";if(!paused){last=0;raf=requestAnimationFrame(loop)}}
+function pause(){if(!running)return;paused=!paused;emit({type:"BT_INVADERS_STATE",...state()});if(paused){keys.left=false;keys.right=false;}E("pauseOverlay").classList.toggle("show",paused);E("pause").textContent=paused?"RESUME":"PAUSE";if(!paused){last=0;raf=requestAnimationFrame(loop)}}
 E("testVoice").onclick=function(){lang=E("language").value;loadVoices();var samples={"de-DE":"Guten Morgen","es-ES":"Buenos días","da-DK":"Godmorgen","en-US":"Good morning"},v=voiceFor(lang);if(!v){updateVoiceCheck();return}var u=new SpeechSynthesisUtterance(samples[lang]||"Hello");u.voice=v;u.lang=v.lang;u.rate=.82;speechSynthesis.cancel();speechSynthesis.speak(u)};
-E("play").onclick=start;E("again").onclick=start;E("restart").onclick=start;E("pause").onclick=pause;E("mainMenu").onclick=function(){running=false;keys.left=false;keys.right=false;cancelAnimationFrame(raf);if(window.parent!==window){window.parent.postMessage({type:"BT_INVADERS_MENU"},"*")}else{start()}};E("overMenu").onclick=E("mainMenu").onclick;E("swap").onclick=function(){var a=parse(ta.value);ta.value=a.map(function(x){return x[1]+"\t"+x[0]}).join("\n");preview()};E("language").onchange=function(){cats(false);E("category").value="custom";lang=this.value;updateVoiceCheck()};E("category").onchange=loadCat;ta.oninput=function(){E("category").value="custom";preview()};E("sound").onclick=function(){soundOn=!soundOn;this.textContent=soundOn?"🔊 SOUND ON":"🔇 SOUND OFF"};
+E("play").onclick=start;E("again").onclick=start;E("restart").onclick=start;E("pause").onclick=pause;E("mainMenu").onclick=function(){running=false;keys.left=false;keys.right=false;cancelAnimationFrame(raf);if(window.parent!==window){emit({type:"BT_INVADERS_MENU"})}else{start()}};E("overMenu").onclick=E("mainMenu").onclick;E("swap").onclick=function(){var a=parse(ta.value);ta.value=a.map(function(x){return x[1]+"\t"+x[0]}).join("\n");preview()};E("language").onchange=function(){cats(false);E("category").value="custom";lang=this.value;updateVoiceCheck()};E("category").onchange=loadCat;ta.oninput=function(){E("category").value="custom";preview()};E("sound").onclick=function(){soundOn=!soundOn;this.textContent=soundOn?"🔊 SOUND ON":"🔇 SOUND OFF"};
 window.addEventListener("keydown",function(e){if(!game.classList.contains("active"))return;var k=e.key.toLowerCase();if(e.code==="Space"||k==="arrowup"||k==="arrowdown"||k==="arrowleft"||k==="arrowright"||k==="w"||k==="a"||k==="d")e.preventDefault();if(k==="arrowleft"||k==="a"){keys.left=true;e.preventDefault()}if(k==="arrowright"||k==="d"){keys.right=true;e.preventDefault()}if((k==="arrowup"||k==="w"||e.code==="Space")&&!e.repeat){fire();e.preventDefault()}if(k==="p"&&!e.repeat)pause()},{passive:false});window.addEventListener("keyup",function(e){var k=e.key.toLowerCase();if(k==="arrowleft"||k==="a")keys.left=false;if(k==="arrowright"||k==="d")keys.right=false});function bindMobileHold(id,key){
  var button=E(id),held=new Set();
  function down(e){if(e.pointerType==="mouse"&&e.button!==0)return;e.preventDefault();held.add(e.pointerId);if(button.setPointerCapture)try{button.setPointerCapture(e.pointerId)}catch(x){};if(running&&!paused)keys[key]=true;}
@@ -240,17 +245,30 @@ function applyConfig(data){
  var languageSelect=E("language");
  if(!Array.from(languageSelect.options).some(function(option){return option.value===chosenLanguage})){var extra=document.createElement("option");extra.value=chosenLanguage;extra.textContent=({"fr-FR":"French","it-IT":"Italian"})[chosenLanguage]||chosenLanguage;languageSelect.appendChild(extra)}
  languageSelect.value=chosenLanguage;
- ta.value=pairs.map(function(p){return p[0]+"\t"+p[1]}).join("\n");
+ configuredPairs=pairs;
  return true;
 }
-window.addEventListener("message",function(event){
- var d=event.data||{};
- if(d.type==="BT_INVADERS_PING"){window.parent.postMessage({type:"BT_INVADERS_READY"},event.origin)}
- if(d.type==="BT_INVADERS_START"&&applyConfig(d)){start()}
- if(d.type==="BT_INVADERS_PAUSE"&&running&&!paused)pause();
- if(d.type==="BT_INVADERS_RESUME"&&running&&paused)pause();
- if(d.type==="BT_INVADERS_RESTART"&&running)start();
-});
-if(window.parent===window){ta.value=demoWords;start()}else{window.parent.postMessage({type:"BT_INVADERS_READY"},"*")}
+var configuredPairs=null,subscriber=null,disposed=false;
+function emit(event){if(subscriber)subscriber(event)}
+function state(){
+ return {status:disposed?"disposed":!running&&configuredPairs&&lives<=0?"ended":running&&!paused?"running":"paused",
+   soundOn,score,lives,round,done};
+}
+function stop(){running=false;releaseMobileControls();cancelAnimationFrame(raf);clearTimeout(flash.t)}
+window.BTInvaders={
+ initialize(set){
+   if(!Array.isArray(set.pairs)||set.pairs.length<5||!set.pairs.every(p=>Array.isArray(p)&&p.length===2&&p.every(v=>typeof v==="string"&&v.trim())))return false;
+   return applyConfig({pairs:set.pairs,language:set.language});
+ },
+ setShellManaged(value){document.body.classList.toggle("shell-managed",value);return true},
+ subscribe(handler){if(subscriber)return false;subscriber=handler;return true},
+ resume(){if(!configuredPairs)return false;if(!running){if(lives<=0)return false;start()}else if(paused)pause();return true},
+ pause(){if(running&&!paused)pause();return true},
+ restart(){if(!configuredPairs)return false;start();return true},
+ setSound(value){if(typeof value!=="boolean")return false;soundOn=value;return true},
+ resize,state,
+ dispose(){disposed=true;stop();subscriber=null}
+};
+if(window.parent===window){ta.value=demoWords;start()}
 
-})();</script></body></html>
+})();</script><script type="module" src="./bootstrap.mjs"></script></body></html>
